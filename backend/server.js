@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
 const app = express();
@@ -31,10 +30,25 @@ function extractTextFromPDF(buffer) {
   });
 }
 
-async function parseResumeWithGemini(resumeText) {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+async function callGroq(prompt) {
+  const response = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }]
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  return response.data.choices[0].message.content;
+}
 
+async function parseResumeWithGroq(resumeText) {
   const prompt = `Extract data from this resume. Return ONLY valid JSON, no explanation, no markdown, no backticks.
 Format:
 {
@@ -50,16 +64,12 @@ Format:
 Resume:
 ${resumeText}`;
 
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text();
+  const raw = await callGroq(prompt);
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   return JSON.parse(jsonMatch[0]);
 }
 
 async function generateJobMatches(profile) {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
   const prompt = `You are a job matching expert. Based on this resume profile, generate 10 realistic job matches that would exist on LinkedIn, Naukri, and Glassdoor in India right now.
 
 Resume Profile:
@@ -85,8 +95,7 @@ Make companies realistic (Infosys, TCS, Wipro, Accenture, Microsoft, Google, Ama
 Score each job 60-98 based on how well the skills match.
 Vary the platforms between LinkedIn, Naukri, Glassdoor, Indeed, Foundit.`;
 
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text();
+  const raw = await callGroq(prompt);
   const jsonMatch = raw.match(/\[[\s\S]*\]/);
   return JSON.parse(jsonMatch[0]);
 }
@@ -99,7 +108,7 @@ app.post('/api/parse-resume', upload.single('resume'), async (req, res) => {
     console.log('Parsing resume...');
     const text = await extractTextFromPDF(req.file.buffer);
     console.log('PDF text extracted, length:', text.length);
-    const profile = await parseResumeWithGemini(text);
+    const profile = await parseResumeWithGroq(text);
     console.log('Resume parsed:', profile.name, '-', profile.title);
     res.json({ success: true, profile });
   } catch (err) {
