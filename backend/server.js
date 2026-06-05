@@ -1,8 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const pdfParse = require('pdf-parse');
-const pdfParseLib = pdfParse.default || pdfParse;
 const axios = require('axios');
 require('dotenv').config();
 
@@ -10,6 +8,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
+
+async function extractTextFromPDF(buffer) {
+  const pdfParse = require('pdf-parse');
+  const fn = typeof pdfParse === 'function' ? pdfParse : pdfParse.default;
+  const data = await fn(buffer);
+  return data.text;
+}
 
 async function parseResumeWithClaude(resumeText) {
   const response = await axios.post(
@@ -73,7 +78,7 @@ Return ONLY a valid JSON array of 10 jobs. No explanation. Format:
     "missing_skills": ["skill1"],
     "reason": "one sentence why this matches",
     "posted": "2 days ago",
-    "apply_link": "https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(profile.title || 'security engineer')}&location=India"
+    "apply_link": "https://www.linkedin.com/jobs/search/?keywords=security+engineer&location=India"
   }
 ]
 
@@ -101,8 +106,8 @@ app.post('/api/parse-resume', upload.single('resume'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     console.log('Parsing resume...');
-    const pdfData = await pdfParseLib(req.file.buffer);
-    const profile = await parseResumeWithClaude(pdfData.text);
+    const text = await extractTextFromPDF(req.file.buffer);
+    const profile = await parseResumeWithClaude(text);
     console.log('Resume parsed:', profile.name, '-', profile.title);
     res.json({ success: true, profile });
   } catch (err) {
