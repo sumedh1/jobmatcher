@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-const API = 'https://jobmatcher-backend.onrender.com/api'
+const API = 'https://jobmatcher-p0bm.onrender.com/api'
 
 function App() {
   const [step, setStep] = useState('upload')
