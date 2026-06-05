@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
-const PDFParser = require('pdf2json');
 require('dotenv').config();
 
 const app = express();
@@ -12,13 +11,22 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 function extractTextFromPDF(buffer) {
   return new Promise((resolve, reject) => {
-    const pdfParser = new PDFParser();
-    pdfParser.on('pdfParser_dataError', err => reject(err));
-    pdfParser.on('pdfParser_dataReady', pdfData => {
-      const text = pdfParser.getRawTextContent();
-      resolve(text);
-    });
-    pdfParser.parseBuffer(buffer);
+    try {
+      const PDFParser = require('pdf2json');
+      const pdfParser = new PDFParser(null, 1);
+      pdfParser.on('pdfParser_dataError', errData => reject(new Error(errData.parserError)));
+      pdfParser.on('pdfParser_dataReady', () => {
+        try {
+          const text = pdfParser.getRawTextContent();
+          resolve(text);
+        } catch (e) {
+          reject(e);
+        }
+      });
+      pdfParser.parseBuffer(buffer);
+    } catch (e) {
+      reject(e);
+    }
   });
 }
 
@@ -113,6 +121,7 @@ app.post('/api/parse-resume', upload.single('resume'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     console.log('Parsing resume...');
     const text = await extractTextFromPDF(req.file.buffer);
+    console.log('PDF text extracted, length:', text.length);
     const profile = await parseResumeWithClaude(text);
     console.log('Resume parsed:', profile.name, '-', profile.title);
     res.json({ success: true, profile });
