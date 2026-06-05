@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
 const app = express();
@@ -30,15 +31,11 @@ function extractTextFromPDF(buffer) {
   });
 }
 
-async function parseResumeWithClaude(resumeText) {
-  const response = await axios.post(
-    'https://api.anthropic.com/v1/messages',
-    {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: `Extract data from this resume. Return ONLY valid JSON, no explanation.
+async function parseResumeWithGemini(resumeText) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const prompt = `Extract data from this resume. Return ONLY valid JSON, no explanation, no markdown, no backticks.
 Format:
 {
   "name": "",
@@ -51,42 +48,30 @@ Format:
   "summary": ""
 }
 Resume:
-${resumeText}`
-      }]
-    },
-    {
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      }
-    }
-  );
-  const raw = response.data.content[0].text;
+${resumeText}`;
+
+  const result = await model.generateContent(prompt);
+  const raw = result.response.text();
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   return JSON.parse(jsonMatch[0]);
 }
 
 async function generateJobMatches(profile) {
-  const response = await axios.post(
-    'https://api.anthropic.com/v1/messages',
-    {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: `You are a job matching expert. Based on this resume profile, generate 10 realistic job matches that would exist on LinkedIn, Naukri, and Glassdoor in India right now.
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const prompt = `You are a job matching expert. Based on this resume profile, generate 10 realistic job matches that would exist on LinkedIn, Naukri, and Glassdoor in India right now.
 
 Resume Profile:
 ${JSON.stringify(profile, null, 2)}
 
-Return ONLY a valid JSON array of 10 jobs. No explanation. Format:
+Return ONLY a valid JSON array of 10 jobs. No explanation, no markdown, no backticks. Format:
 [
   {
     "title": "job title",
     "company": "real company name hiring for this role in India",
     "location": "city, India",
-    "via": "LinkedIn / Naukri / Glassdoor / Indeed",
+    "via": "LinkedIn",
     "score": 85,
     "matching_skills": ["skill1", "skill2", "skill3"],
     "missing_skills": ["skill1"],
@@ -98,18 +83,10 @@ Return ONLY a valid JSON array of 10 jobs. No explanation. Format:
 
 Make companies realistic (Infosys, TCS, Wipro, Accenture, Microsoft, Google, Amazon, Flipkart, Zomato, Paytm, HDFC, Barclays, Citi, IBM, Capgemini, etc).
 Score each job 60-98 based on how well the skills match.
-Vary the platforms between LinkedIn, Naukri, Glassdoor, Indeed, Foundit.`
-      }]
-    },
-    {
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      }
-    }
-  );
-  const raw = response.data.content[0].text;
+Vary the platforms between LinkedIn, Naukri, Glassdoor, Indeed, Foundit.`;
+
+  const result = await model.generateContent(prompt);
+  const raw = result.response.text();
   const jsonMatch = raw.match(/\[[\s\S]*\]/);
   return JSON.parse(jsonMatch[0]);
 }
@@ -122,7 +99,7 @@ app.post('/api/parse-resume', upload.single('resume'), async (req, res) => {
     console.log('Parsing resume...');
     const text = await extractTextFromPDF(req.file.buffer);
     console.log('PDF text extracted, length:', text.length);
-    const profile = await parseResumeWithClaude(text);
+    const profile = await parseResumeWithGemini(text);
     console.log('Resume parsed:', profile.name, '-', profile.title);
     res.json({ success: true, profile });
   } catch (err) {
