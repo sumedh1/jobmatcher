@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const pdfParse = require('pdf-parse/lib/pdf-parse.js');
+const pdfParse = require('pdf-parse');
+const pdfParseLib = pdfParse.default || pdfParse;
 const axios = require('axios');
 require('dotenv').config();
 
@@ -100,7 +101,7 @@ app.post('/api/parse-resume', upload.single('resume'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     console.log('Parsing resume...');
-    const pdfData = await pdfParse(req.file.buffer);
+    const pdfData = await pdfParseLib(req.file.buffer);
     const profile = await parseResumeWithClaude(pdfData.text);
     console.log('Resume parsed:', profile.name, '-', profile.title);
     res.json({ success: true, profile });
