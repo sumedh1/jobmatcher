@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
+const PDFParser = require('pdf2json');
 require('dotenv').config();
 
 const app = express();
@@ -9,11 +10,16 @@ app.use(cors());
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
-async function extractTextFromPDF(buffer) {
-  const pdfParse = require('pdf-parse');
-  const fn = typeof pdfParse === 'function' ? pdfParse : pdfParse.default;
-  const data = await fn(buffer);
-  return data.text;
+function extractTextFromPDF(buffer) {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+    pdfParser.on('pdfParser_dataError', err => reject(err));
+    pdfParser.on('pdfParser_dataReady', pdfData => {
+      const text = pdfParser.getRawTextContent();
+      resolve(text);
+    });
+    pdfParser.parseBuffer(buffer);
+  });
 }
 
 async function parseResumeWithClaude(resumeText) {
