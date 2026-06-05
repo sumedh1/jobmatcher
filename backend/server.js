@@ -33,7 +33,7 @@ function extractTextFromPDF(buffer) {
 
 async function parseResumeWithGemini(resumeText) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const prompt = `Extract data from this resume. Return ONLY valid JSON, no explanation, no markdown, no backticks.
 Format:
@@ -58,7 +58,7 @@ ${resumeText}`;
 
 async function generateJobMatches(profile) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const prompt = `You are a job matching expert. Based on this resume profile, generate 10 realistic job matches that would exist on LinkedIn, Naukri, and Glassdoor in India right now.
 
