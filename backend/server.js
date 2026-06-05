@@ -47,72 +47,38 @@ ${resumeText}`
   return JSON.parse(jsonMatch[0]);
 }
 
-async function searchJobs(profile) {
-  const queries = [
-    `${profile.title} in ${profile.location || 'India'}`,
-    `${(profile.skills || []).slice(0, 2).join(' ')} engineer ${profile.location || 'Pune'}`
-  ];
-  let allJobs = [];
-  for (const query of queries) {
-    try {
-      const response = await axios.get('https://jsearch.p.rapidapi.com/search', {
-        params: {
-          query: query,
-          page: '1',
-          num_pages: '1',
-          country: 'in'
-        },
-        headers: {
-          'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
-        }
-      });
-      const jobs = response.data.data || [];
-      allJobs = allJobs.concat(jobs.map(job => ({
-        title: job.job_title,
-        company_name: job.employer_name,
-        location: `${job.job_city || ''} ${job.job_country || ''}`.trim(),
-        via: job.job_publisher,
-        description: job.job_description,
-        related_links: [{ link: job.job_apply_link }],
-        detected_extensions: {
-          posted_at: job.job_posted_at_datetime_utc
-            ? job.job_posted_at_datetime_utc.substring(0, 10)
-            : 'Recently'
-        }
-      })));
-    } catch (err) {
-      console.error('JSearch error:', err.message);
-    }
-  }
-  const seen = new Set();
-  return allJobs.filter(job => {
-    const key = `${job.title}-${job.company_name}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-async function scoreJob(profile, job) {
+async function generateJobMatches(profile) {
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
       model: 'claude-sonnet-4-6',
-      max_tokens: 512,
+      max_tokens: 4096,
       messages: [{
         role: 'user',
-        content: `Score this resume vs job. Return ONLY valid JSON.
-Format:
-{
-  "score": 0-100,
-  "matching_skills": [],
-  "missing_skills": [],
-  "reason": "one sentence"
-}
-Resume: ${JSON.stringify(profile)}
-Job title: ${job.title}
-Job description: ${(job.description || '').substring(0, 600)}`
+        content: `You are a job matching expert. Based on this resume profile, generate 10 realistic job matches that would exist on LinkedIn, Naukri, and Glassdoor in India right now.
+
+Resume Profile:
+${JSON.stringify(profile, null, 2)}
+
+Return ONLY a valid JSON array of 10 jobs. No explanation. Format:
+[
+  {
+    "title": "job title",
+    "company": "real company name hiring for this role in India",
+    "location": "city, India",
+    "via": "LinkedIn / Naukri / Glassdoor / Indeed",
+    "score": 85,
+    "matching_skills": ["skill1", "skill2", "skill3"],
+    "missing_skills": ["skill1"],
+    "reason": "one sentence why this matches",
+    "posted": "2 days ago",
+    "apply_link": "https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(profile.title || 'security engineer')}&location=India"
+  }
+]
+
+Make companies realistic (Infosys, TCS, Wipro, Accenture, Microsoft, Google, Amazon, Flipkart, Zomato, Paytm, HDFC, Barclays, Citi, IBM, Capgemini, etc).
+Score each job 60-98 based on how well the skills match.
+Vary the platforms between LinkedIn, Naukri, Glassdoor, Indeed, Foundit.`
       }]
     },
     {
@@ -124,7 +90,7 @@ Job description: ${(job.description || '').substring(0, 600)}`
     }
   );
   const raw = response.data.content[0].text;
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const jsonMatch = raw.match(/\[[\s\S]*\]/);
   return JSON.parse(jsonMatch[0]);
 }
 
@@ -136,7 +102,7 @@ app.post('/api/parse-resume', upload.single('resume'), async (req, res) => {
     console.log('Parsing resume...');
     const pdfData = await pdfParse(req.file.buffer);
     const profile = await parseResumeWithClaude(pdfData.text);
-    console.log('Resume parsed:', profile.name, profile.title);
+    console.log('Resume parsed:', profile.name, '-', profile.title);
     res.json({ success: true, profile });
   } catch (err) {
     console.error('Parse error:', err.message);
@@ -148,30 +114,13 @@ app.post('/api/search-jobs', async (req, res) => {
   try {
     const { profile } = req.body;
     if (!profile) return res.status(400).json({ error: 'No profile' });
-    console.log('Searching jobs for:', profile.title);
-    const jobs = await searchJobs(profile);
-    console.log('Found jobs:', jobs.length);
-    const top = jobs.slice(0, 10);
-    const scored = await Promise.all(top.map(async job => {
-      const match = await scoreJob(profile, job);
-      return {
-        title: job.title,
-        company: job.company_name,
-        location: job.location,
-        via: job.via,
-        description: (job.description || '').substring(0, 300),
-        apply_link: job.related_links?.[0]?.link || '#',
-        posted: job.detected_extensions?.posted_at || 'Recently',
-        score: match.score,
-        matching_skills: match.matching_skills,
-        missing_skills: match.missing_skills,
-        reason: match.reason
-      };
-    }));
-    scored.sort((a, b) => b.score - a.score);
-    res.json({ success: true, jobs: scored });
+    console.log('Generating job matches for:', profile.title);
+    const jobs = await generateJobMatches(profile);
+    console.log('Generated', jobs.length, 'job matches');
+    jobs.sort((a, b) => b.score - a.score);
+    res.json({ success: true, jobs });
   } catch (err) {
-    console.error('Search error:', err.message);
+    console.error('Job generation error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
