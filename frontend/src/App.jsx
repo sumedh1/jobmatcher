@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 const API = 'http://localhost:5000/api'
 
@@ -41,10 +41,8 @@ const style = `
   .loading-card h3 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 8px; }
   .loading-card p { font-size: 14px; color: #64748B; }
   .loading-steps { display: flex; justify-content: center; gap: 24px; margin-top: 28px; flex-wrap: wrap; }
-  .loading-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
-  .loading-step.active { color: #60A5FA; }
-  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: #1E3A5F; }
-  .step-dot.active { background: #2563EB; animation: pulse 1s infinite; }
+  .loading-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #60A5FA; }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563EB; animation: pulse 1s infinite; }
   .results-wrap { padding-top: 40px; padding-bottom: 60px; }
   .profile-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
   .profile-info { display: flex; gap: 16px; align-items: center; flex: 1; }
@@ -56,8 +54,6 @@ const style = `
   .new-search-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #94A3B8; font-size: 13px; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
   .new-search-btn:hover { border-color: rgba(255,255,255,0.2); color: #fff; }
   .section-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 16px; }
-
-  /* ANALYSIS */
   .analysis-wrap { margin-bottom: 40px; }
   .score-hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 28px; margin-bottom: 16px; align-items: center; }
   .big-score { text-align: center; }
@@ -69,11 +65,11 @@ const style = `
   .score-bar-row { display: flex; align-items: center; gap: 12px; }
   .score-bar-label { font-size: 13px; color: #94A3B8; min-width: 100px; }
   .score-bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
-  .score-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+  .score-bar-fill { height: 100%; border-radius: 3px; }
   .score-bar-val { font-size: 13px; font-weight: 500; min-width: 36px; text-align: right; }
   .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .analysis-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px; }
-  .analysis-card-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .analysis-card-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 14px; }
   .analysis-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .analysis-list li { font-size: 13px; color: #94A3B8; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
   .li-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
@@ -95,13 +91,32 @@ const style = `
   .kw-miss { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); color: #FCA5A5; }
   .exp-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
   .exp-text { font-size: 14px; color: #94A3B8; line-height: 1.7; }
-
-  /* JOBS */
   .jobs-section { margin-top: 40px; }
   .jobs-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 20px; }
   .stat-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px 20px; }
   .stat-num { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 2px; }
   .stat-label { font-size: 12px; color: #475569; }
+
+  /* FILTERS */
+  .filters-bar { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px 20px; margin-bottom: 20px; }
+  .filters-title { font-size: 13px; font-weight: 500; color: #94A3B8; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .filters-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; }
+  .filter-label { font-size: 11px; color: #475569; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+  .filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-pill { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1px solid rgba(255,255,255,0.1); color: #64748B; background: transparent; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .filter-pill:hover { border-color: rgba(37,99,235,0.4); color: #93C5FD; }
+  .filter-pill.active { background: rgba(37,99,235,0.15); border-color: rgba(37,99,235,0.4); color: #60A5FA; }
+  .filter-input { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 12px; font-size: 13px; color: #e8eaf0; font-family: 'DM Sans', sans-serif; outline: none; width: 180px; }
+  .filter-input:focus { border-color: rgba(37,99,235,0.4); }
+  .filter-input::placeholder { color: #334155; }
+  .clear-filters { padding: 5px 12px; border-radius: 20px; font-size: 12px; border: 1px solid rgba(239,68,68,0.2); color: #FCA5A5; background: rgba(239,68,68,0.06); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .clear-filters:hover { background: rgba(239,68,68,0.12); }
+  .results-count { font-size: 13px; color: #475569; margin-bottom: 16px; }
+  .results-count span { color: #60A5FA; font-weight: 500; }
+  .no-results { text-align: center; padding: 48px 24px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; }
+  .no-results p { font-size: 15px; color: #475569; margin-bottom: 12px; }
+
   .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .section-count { font-size: 12px; color: #475569; background: rgba(255,255,255,0.04); padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.06); }
   .jobs-list { display: flex; flex-direction: column; gap: 12px; }
@@ -121,20 +136,25 @@ const style = `
   .match-skill { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); color: #86EFAC; }
   .miss-skill { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.15); color: #FCD34D; }
   .job-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); }
-  .job-meta { display: flex; gap: 16px; align-items: center; }
+  .job-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .via-badge { font-size: 11px; padding: 3px 10px; border-radius: 6px; background: rgba(255,255,255,0.04); color: #64748B; border: 1px solid rgba(255,255,255,0.06); }
+  .work-type-badge { font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 1px solid; }
+  .wt-remote { background: rgba(34,197,94,0.06); color: #86EFAC; border-color: rgba(34,197,94,0.15); }
+  .wt-hybrid { background: rgba(37,99,235,0.06); color: #93C5FD; border-color: rgba(37,99,235,0.15); }
+  .wt-onsite { background: rgba(245,158,11,0.06); color: #FCD34D; border-color: rgba(245,158,11,0.15); }
   .job-date { font-size: 12px; color: #334155; }
   .apply-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background: linear-gradient(135deg, #2563EB, #7C3AED); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; text-decoration: none; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
   .apply-btn:hover { opacity: 0.9; transform: translateY(-1px); }
   footer { text-align: center; padding: 32px 0; border-top: 1px solid rgba(255,255,255,0.04); color: #1E293B; font-size: 12px; position: relative; z-index: 1; margin-top: 40px; }
 `
 
-function ScoreRing({ score, label, size = 110 }) {
+function ScoreRing({ score, label }) {
   const color = score >= 80 ? '#4ADE80' : score >= 60 ? '#60A5FA' : '#FCD34D'
   const border = score >= 80 ? 'rgba(34,197,94,0.4)' : score >= 60 ? 'rgba(37,99,235,0.4)' : 'rgba(245,158,11,0.4)'
+  const bg = score >= 80 ? 'rgba(34,197,94,0.06)' : score >= 60 ? 'rgba(37,99,235,0.06)' : 'rgba(245,158,11,0.06)'
   return (
     <div className="big-score">
-      <div className="big-score-ring" style={{ borderColor: border, background: score >= 80 ? 'rgba(34,197,94,0.06)' : score >= 60 ? 'rgba(37,99,235,0.06)' : 'rgba(245,158,11,0.06)' }}>
+      <div className="big-score-ring" style={{ borderColor: border, background: bg }}>
         <div className="big-score-num" style={{ color }}>{score}</div>
         <div className="big-score-label">/100</div>
       </div>
@@ -156,6 +176,10 @@ function ScoreBar({ label, value }) {
   )
 }
 
+const WORK_TYPES = ['All', 'Remote', 'Hybrid', 'On-site']
+const PLATFORMS = ['All', 'LinkedIn', 'Naukri', 'Glassdoor', 'Indeed', 'Foundit']
+const SCORES = ['All', '90%+', '80%+', '70%+', '60%+']
+
 export default function App() {
   const [step, setStep] = useState('upload')
   const [profile, setProfile] = useState(null)
@@ -163,6 +187,39 @@ export default function App() {
   const [jobs, setJobs] = useState([])
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
+
+  const [workType, setWorkType] = useState('All')
+  const [platform, setPlatform] = useState('All')
+  const [minScore, setMinScore] = useState('All')
+  const [locationSearch, setLocationSearch] = useState('')
+  const [titleSearch, setTitleSearch] = useState('')
+
+  const filteredJobs = useMemo(() => {
+    return jobs.filter(job => {
+      if (workType !== 'All') {
+        const jt = (job.work_type || job.title + job.location || '').toLowerCase()
+        const wt = workType.toLowerCase()
+        if (wt === 'remote' && !jt.includes('remote')) return false
+        if (wt === 'hybrid' && !jt.includes('hybrid')) return false
+        if (wt === 'on-site' && (jt.includes('remote') || jt.includes('hybrid'))) return false
+      }
+      if (platform !== 'All' && (job.via || '').toLowerCase() !== platform.toLowerCase()) return false
+      if (minScore !== 'All') {
+        const min = parseInt(minScore)
+        if (job.score < min) return false
+      }
+      if (locationSearch && !(job.location || '').toLowerCase().includes(locationSearch.toLowerCase())) return false
+      if (titleSearch && !(job.title || '').toLowerCase().includes(titleSearch.toLowerCase())) return false
+      return true
+    })
+  }, [jobs, workType, platform, minScore, locationSearch, titleSearch])
+
+  const hasFilters = workType !== 'All' || platform !== 'All' || minScore !== 'All' || locationSearch || titleSearch
+
+  const clearFilters = () => {
+    setWorkType('All'); setPlatform('All'); setMinScore('All')
+    setLocationSearch(''); setTitleSearch('')
+  }
 
   const handleFile = async (file) => {
     if (!file || file.type !== 'application/pdf') { setError('Please upload a PDF file'); return }
@@ -175,22 +232,24 @@ export default function App() {
       if (!data.success) throw new Error(data.error)
       setProfile(data.profile)
       setAnalysis(data.analysis)
-      setJobs(data.jobs)
+      const jobsWithType = (data.jobs || []).map(j => ({
+        ...j,
+        work_type: j.work_type || (j.location?.toLowerCase().includes('remote') ? 'Remote' : j.location?.toLowerCase().includes('hybrid') ? 'Hybrid' : 'On-site')
+      }))
+      setJobs(jobsWithType)
       setStep('results')
     } catch (e) { setError(e.message); setStep('upload') }
   }
 
   const scoreBadge = (s) => s >= 85 ? 'score-badge score-hi' : s >= 70 ? 'score-badge score-md' : 'score-badge score-lo'
   const initials = (name) => name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'JM'
+  const workTypeBadge = (wt) => wt === 'Remote' ? 'work-type-badge wt-remote' : wt === 'Hybrid' ? 'work-type-badge wt-hybrid' : 'work-type-badge wt-onsite'
 
   return (
     <>
       <style>{style}</style>
       <div className="app">
-        <div className="bg-grid" />
-        <div className="bg-glow" />
-        <div className="bg-glow2" />
-
+        <div className="bg-grid" /><div className="bg-glow" /><div className="bg-glow2" />
         <nav>
           <div className="wrap nav-inner">
             <div className="logo">
@@ -200,7 +259,6 @@ export default function App() {
             <div className="nav-badge">Powered by Groq AI</div>
           </div>
         </nav>
-
         <div className="wrap">
           {step === 'upload' && (
             <>
@@ -238,9 +296,7 @@ export default function App() {
               <p>Scoring, finding gaps, and matching jobs — takes about 30 seconds</p>
               <div className="loading-steps">
                 {['Extract text', 'Parse profile', 'Analyze resume', 'Match jobs'].map((s, i) => (
-                  <div key={i} className="loading-step active">
-                    <div className="step-dot active" />{s}
-                  </div>
+                  <div key={i} className="loading-step"><div className="step-dot" />{s}</div>
                 ))}
               </div>
             </div>
@@ -259,13 +315,11 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                <button className="new-search-btn" onClick={() => { setStep('upload'); setProfile(null); setAnalysis(null); setJobs([]); }}>↑ New search</button>
+                <button className="new-search-btn" onClick={() => { setStep('upload'); setProfile(null); setAnalysis(null); setJobs([]); clearFilters(); }}>↑ New search</button>
               </div>
 
-              {/* RESUME ANALYSIS */}
               <div className="analysis-wrap">
                 <div className="section-title">📊 Resume Analysis</div>
-
                 <div className="score-hero">
                   <div style={{ display: 'flex', gap: 24 }}>
                     <ScoreRing score={analysis.overall_score} label="Overall Score" />
@@ -277,7 +331,6 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-
                 <div className="analysis-grid">
                   <div className="analysis-card">
                     <div className="analysis-card-title">✅ Strengths</div>
@@ -296,7 +349,6 @@ export default function App() {
                     </ul>
                   </div>
                 </div>
-
                 <div className="suggestions-card">
                   <div className="analysis-card-title">💡 Suggestions to improve</div>
                   {(analysis.suggestions || []).map((s, i) => (
@@ -309,22 +361,16 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-
                 <div className="keywords-row">
                   <div className="kw-card">
                     <div className="kw-title">✅ Keywords found</div>
-                    <div className="kw-pills">
-                      {(analysis.keywords_found || []).map(k => <span key={k} className="kw-found">{k}</span>)}
-                    </div>
+                    <div className="kw-pills">{(analysis.keywords_found || []).map(k => <span key={k} className="kw-found">{k}</span>)}</div>
                   </div>
                   <div className="kw-card">
                     <div className="kw-title">❌ Keywords missing</div>
-                    <div className="kw-pills">
-                      {(analysis.keywords_missing || []).map(k => <span key={k} className="kw-miss">{k}</span>)}
-                    </div>
+                    <div className="kw-pills">{(analysis.keywords_missing || []).map(k => <span key={k} className="kw-miss">{k}</span>)}</div>
                   </div>
                 </div>
-
                 <div className="exp-card">
                   <div className="analysis-card-title">🎓 Experience & Education</div>
                   <div className="exp-text">{analysis.experience_summary}</div>
@@ -332,47 +378,95 @@ export default function App() {
                 </div>
               </div>
 
-              {/* JOBS */}
               <div className="jobs-section">
                 <div className="section-title">💼 Matched Jobs</div>
                 <div className="jobs-stats">
                   {[['Total matches', jobs.length], ['Strong 85%+', jobs.filter(j => j.score >= 85).length], ['Good 70%+', jobs.filter(j => j.score >= 70).length]].map(([l, v]) => (
-                    <div key={l} className="stat-card">
-                      <div className="stat-num">{v}</div>
-                      <div className="stat-label">{l}</div>
-                    </div>
+                    <div key={l} className="stat-card"><div className="stat-num">{v}</div><div className="stat-label">{l}</div></div>
                   ))}
                 </div>
-                <div className="section-header">
-                  <div style={{ fontSize: 14, color: '#64748B' }}>Sorted by match score</div>
-                  <div className="section-count">{jobs.length} jobs</div>
-                </div>
-                <div className="jobs-list">
-                  {jobs.map((job, i) => (
-                    <div key={i} className={`job-card ${job.score >= 85 ? 'top-match' : ''}`}>
-                      {job.score >= 90 && <div className="top-badge">TOP MATCH</div>}
-                      <div className="job-top">
-                        <div>
-                          <div className="job-title">{job.title}</div>
-                          <div className="job-company">{job.company} · {job.location}</div>
-                        </div>
-                        <div className={scoreBadge(job.score)}>{job.score}%</div>
-                      </div>
-                      <div className="job-reason">{job.reason}</div>
-                      <div className="job-skills">
-                        {(job.matching_skills || []).slice(0, 4).map(s => <span key={s} className="match-skill">✓ {s}</span>)}
-                        {(job.missing_skills || []).slice(0, 2).map(s => <span key={s} className="miss-skill">+ {s}</span>)}
-                      </div>
-                      <div className="job-footer">
-                        <div className="job-meta">
-                          <div className="via-badge">{job.via}</div>
-                          <div className="job-date">{job.posted}</div>
-                        </div>
-                        <a href={job.apply_link} target="_blank" rel="noreferrer" className="apply-btn">Apply now →</a>
+
+                {/* FILTERS */}
+                <div className="filters-bar">
+                  <div className="filters-title">🔍 Filter jobs</div>
+                  <div className="filters-row">
+                    <div className="filter-group">
+                      <div className="filter-label">Work type</div>
+                      <div className="filter-pills">
+                        {WORK_TYPES.map(t => (
+                          <button key={t} className={`filter-pill ${workType === t ? 'active' : ''}`} onClick={() => setWorkType(t)}>{t}</button>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                    <div className="filter-group">
+                      <div className="filter-label">Platform</div>
+                      <div className="filter-pills">
+                        {PLATFORMS.map(p => (
+                          <button key={p} className={`filter-pill ${platform === p ? 'active' : ''}`} onClick={() => setPlatform(p)}>{p}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="filter-group">
+                      <div className="filter-label">Min score</div>
+                      <div className="filter-pills">
+                        {SCORES.map(s => (
+                          <button key={s} className={`filter-pill ${minScore === s ? 'active' : ''}`} onClick={() => setMinScore(s === 'All' ? 'All' : parseInt(s))}>{s}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="filters-row" style={{ marginTop: 12 }}>
+                    <div className="filter-group">
+                      <div className="filter-label">Search location</div>
+                      <input className="filter-input" placeholder="e.g. Pune, Mumbai, Bangalore..." value={locationSearch} onChange={e => setLocationSearch(e.target.value)} />
+                    </div>
+                    <div className="filter-group">
+                      <div className="filter-label">Search job title</div>
+                      <input className="filter-input" placeholder="e.g. Security Engineer..." value={titleSearch} onChange={e => setTitleSearch(e.target.value)} />
+                    </div>
+                    {hasFilters && <button className="clear-filters" onClick={clearFilters}>✕ Clear filters</button>}
+                  </div>
                 </div>
+
+                <div className="results-count">
+                  Showing <span>{filteredJobs.length}</span> of {jobs.length} jobs
+                  {hasFilters && ' (filtered)'}
+                </div>
+
+                {filteredJobs.length === 0 ? (
+                  <div className="no-results">
+                    <p>No jobs match your current filters.</p>
+                    <button className="clear-filters" onClick={clearFilters}>Clear all filters</button>
+                  </div>
+                ) : (
+                  <div className="jobs-list">
+                    {filteredJobs.map((job, i) => (
+                      <div key={i} className={`job-card ${job.score >= 85 ? 'top-match' : ''}`}>
+                        {job.score >= 90 && <div className="top-badge">TOP MATCH</div>}
+                        <div className="job-top">
+                          <div>
+                            <div className="job-title">{job.title}</div>
+                            <div className="job-company">{job.company} · {job.location}</div>
+                          </div>
+                          <div className={scoreBadge(job.score)}>{job.score}%</div>
+                        </div>
+                        <div className="job-reason">{job.reason}</div>
+                        <div className="job-skills">
+                          {(job.matching_skills || []).slice(0, 4).map(s => <span key={s} className="match-skill">✓ {s}</span>)}
+                          {(job.missing_skills || []).slice(0, 2).map(s => <span key={s} className="miss-skill">+ {s}</span>)}
+                        </div>
+                        <div className="job-footer">
+                          <div className="job-meta">
+                            <div className="via-badge">{job.via}</div>
+                            <div className={workTypeBadge(job.work_type)}>{job.work_type}</div>
+                            <div className="job-date">{job.posted}</div>
+                          </div>
+                          <a href={job.apply_link} target="_blank" rel="noreferrer" className="apply-btn">Apply now →</a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
